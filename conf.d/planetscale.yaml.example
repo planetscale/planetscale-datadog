@@ -1,0 +1,27 @@
+instances:
+  - planetscale_organization: '<YOUR_PLANETSCALE_ORG_NAME>' # Required: Your PlanetScale organization ID
+    ps_service_token_id: '<YOUR_PLANETSCALE_SERVICE_TOKEN_ID>' # Required: Your PlanetScale Service Token ID
+    ps_service_token_secret: '<YOUR_PLANETSCALE_SERVICE_TOKEN_SECRET>' # Required: Your PlanetScale Service Token Secret. Consider using Datadog secrets management: https://docs.datadoghq.com/agent/guide/secrets-management/
+
+    # OpenMetricsBaseCheck configuration (applied to discovered endpoints)
+    namespace: 'planetscale' # Required: Namespace for the metrics
+    metrics: # Required: List of metrics to collect. Use mapping for renaming/type overrides.
+      - planetscale_vtgate_queries_duration: vtgate_query_duration
+
+      # Add other metrics exposed by the PlanetScale endpoints here
+      # Example with type override:
+      # - some_metric:
+      #     name: my_metric_gauge
+      #     type: gauge
+
+    # Set the collection interval (in seconds)
+    min_collection_interval: 60 # Default is 15s, set to 60s to match ~1 min metric updates
+    send_distribution_buckets: true
+    collect_counters_with_distributions: true
+
+    # Optional OpenMetricsBaseCheck settings
+    # tags:
+    #   - 'static_tag:value' # Additional static tags to add to all metrics
+    # timeout: 5 # Override default timeout for scraping individual endpoints
+    # ssl_verify: true # Set to false to disable SSL verification (not recommended)
+    # prometheus_metrics_prefix: 'mysql_' # Optional prefix to remove from metric names
