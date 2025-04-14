@@ -8,7 +8,7 @@ This allows you to monitor metrics exposed by your PlanetScale database branches
 
 ## Prerequisites
 
-*   **Datadog Agent:** Version 6 or 7 installed and running.
+*   **Datadog Agent:** Modern Release of Version 7 installed and running.
 *   **PlanetScale Account:** Access to the PlanetScale organization you wish to monitor.
 *   **PlanetScale Service Token:** A Service Token (ID and Secret) with `read_metrics_endpoints` permissions. Create one in your PlanetScale organization settings.
 
