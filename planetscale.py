@@ -2,10 +2,10 @@ import requests
 from copy import deepcopy
 
 from datadog_checks.base import AgentCheck, ConfigurationError
-from datadog_checks.base.checks.openmetrics import OpenMetricsBaseCheck
+from datadog_checks.base.checks.openmetrics import OpenMetricsBaseCheckV2
 
 
-class PlanetScaleCheck(OpenMetricsBaseCheck):
+class PlanetScaleCheck(OpenMetricsBaseCheckV2):
     DEFAULT_METRIC_LIMIT = (
         0  # By default, collect all metrics from discovered endpoints
     )
@@ -21,18 +21,17 @@ class PlanetScaleCheck(OpenMetricsBaseCheck):
         for inst in instances:
             init_inst = deepcopy(inst)
             init_inst.setdefault(
-                "prometheus_url", "http://localhost:1/dummy"
-            )  # Dummy URL
+                "openmetrics_endpoint", "http://localhost:1/dummy"
+            )  # Dummy URL for V2
             init_instances.append(init_inst)
 
-        # Initialize OpenMetricsBaseCheck V2
+        # Initialize OpenMetricsBaseCheckV2
         # Pass the modified instances list for initialization
         super(PlanetScaleCheck, self).__init__(
             name,
             init_config,
             init_instances,  # Use instances with dummy URL for init
             default_metric_limit=self.DEFAULT_METRIC_LIMIT,
-            # scraper_config is derived from instances internally in V2+
         )
         # Store original instances without the dummy URL for use in check()
         self.original_instances = instances
@@ -166,7 +165,8 @@ class PlanetScaleCheck(OpenMetricsBaseCheck):
             if query_string:
                 final_url += f"?{query_string}"
 
-            dynamic_instance["prometheus_url"] = final_url
+            # In V2, we use openmetrics_endpoint instead of prometheus_url
+            dynamic_instance["openmetrics_endpoint"] = final_url
             self.log.debug(
                 f"Constructed scrape URL: {final_url} from target: {target_config}"
             )
@@ -188,27 +188,22 @@ class PlanetScaleCheck(OpenMetricsBaseCheck):
             dynamic_instance.pop("ps_service_token_id", None)
             dynamic_instance.pop("ps_service_token_secret", None)
 
-            # Use the scraper_config pattern for OpenMetrics V2
-            # The scraper_config is built from the dynamic_instance
-            scraper_config = self.create_scraper_configuration(dynamic_instance)
-
-            # Process this specific endpoint using the base class method with the dynamic config
-            # Note: In OM V2, check() calls process() internally if configured correctly.
-            # We need to manually call the scraper associated with this dynamic config.
-            # The `process` method itself is deprecated for direct calls in V2.
-            # Process this specific endpoint using the base class's process method
-            # Pass the dynamically created configuration for this target
             try:
-                # The process method handles the scraping and metric submission
-                self.process(scraper_config)
+                # In V2, we use submit_openmetric_values instead of process
+                scraper = self.get_scraper(dynamic_instance)
+                if scraper:
+                    self.submit_openmetric_values(scraper, dynamic_instance)
+                else:
+                    self.log.error(f"Failed to get scraper for endpoint: {final_url}")
+                    raise Exception("Failed to initialize scraper")
             except Exception as e:
                 self.log.error(
-                    f"Error processing dynamic instance {dynamic_instance.get('prometheus_url')}: {e}"
+                    f"Error processing dynamic instance {dynamic_instance.get('openmetrics_endpoint')}: {e}"
                 )
                 # Add a service check for the specific target failure
                 target_tags = dynamic_instance.get("tags", [])
                 target_tags.append(
-                    f"prometheus_url:{dynamic_instance.get('prometheus_url')}"
+                    f"openmetrics_endpoint:{dynamic_instance.get('openmetrics_endpoint')}"
                 )
                 self.service_check(
                     "planetscale.target.can_scrape",
