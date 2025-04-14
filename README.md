@@ -92,7 +92,7 @@ instances:
 2.  **Look for Metrics:** Search for metrics starting with `planetscale.` in your Datadog Metrics Explorer. Allow a few minutes for data to appear after restarting the Agent.
 3.  **Check Service Checks:** Look for the following service checks:
     *   `planetscale.api.can_connect`: Reports the status of the connection to the PlanetScale API. Tags: `planetscale_org:<org_id>`.
-    *   `planetscale.target.can_scrape`: Reports the status of scraping individual discovered endpoints. Tags include `prometheus_url` and discovered labels.
+    *   `ps.openmetrics.health`: Reports the status of scraping individual discovered endpoints. Tags include discovered labels.
 
 ## Troubleshooting
 
