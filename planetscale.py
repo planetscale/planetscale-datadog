@@ -2,7 +2,7 @@ import requests
 from copy import deepcopy
 
 from datadog_checks.base import AgentCheck, ConfigurationError
-from datadog_checks.base.checks.openmetrics import OpenMetricsBaseCheckV2
+from datadog_checks.base.checks.openmetrics.v2.base import OpenMetricsBaseCheckV2
 
 
 class PlanetScaleCheck(OpenMetricsBaseCheckV2):
@@ -11,42 +11,22 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
     )
 
     def __init__(self, name, init_config, instances):
-        # Set the default namespace
-        if "namespace" not in instances[0]:
-            instances[0]["namespace"] = "planetscale"
-
-        # Create a modified instance config for initialization to satisfy the base class
-        # We add a dummy prometheus_url which will be overridden later in check()
+        # Ensure the namespace is set for all instances
         init_instances = []
         for inst in instances:
             init_inst = deepcopy(inst)
-            init_inst.setdefault(
-                "openmetrics_endpoint", "http://localhost:1/dummy"
-            )  # Dummy URL for V2
+            # Explicitly set namespace, defaulting to "planetscale" if not provided
+            init_inst["namespace"] = init_inst.get("namespace", "planetscale")
+            # Add a dummy openmetrics_endpoint to satisfy initial configuration
+            # This will be overridden later when we discover real endpoints
+            init_inst.setdefault("openmetrics_endpoint", "http://localhost:1/dummy")
             init_instances.append(init_inst)
 
-        # Initialize OpenMetricsBaseCheckV2
-        # Pass the modified instances list for initialization
-        super(PlanetScaleCheck, self).__init__(
-            name,
-            init_config,
-            init_instances,  # Use instances with dummy URL for init
-            default_metric_limit=self.DEFAULT_METRIC_LIMIT,
-        )
-        # Store original instances without the dummy URL for use in check()
-        self.original_instances = instances
+        # Initialize with parent class
+        super(PlanetScaleCheck, self).__init__(name, init_config, init_instances)
 
     def check(self, instance):
-        # NOTE: The 'instance' passed here is from the original configuration (self.original_instances),
-        #       NOT the one with the dummy URL used for initialization.
-        #       The base class handles iterating through self.instances internally,
-        #       but we need access to the original config values (like credentials).
-        #       Let's retrieve the *original* instance based on some unique key if multiple instances are possible,
-        #       or assume a single instance for simplicity if that matches the use case.
-        #       For now, assuming the 'instance' passed IS the original one we need.
-        #       If multiple instances are defined in planetscale.yaml, this needs refinement.
-
-        # Get required configuration
+        # Get required configuration directly from the instance
         org_id = instance.get("planetscale_organization")
         token_id = instance.get("ps_service_token_id")
         token_secret = instance.get("ps_service_token_secret")
@@ -65,9 +45,7 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
             )
 
         # Get optional configuration
-        req_timeout = instance.get(
-            "timeout", self.init_config.get("timeout", 10)
-        )  # Use instance timeout, then init_config, then default 10
+        req_timeout = instance.get("timeout", self.init_config.get("timeout", 10))
         ssl_verify = instance.get("ssl_verify", True)
 
         # Construct API URL
@@ -82,7 +60,7 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
             response = requests.get(
                 api_url, headers=headers, timeout=req_timeout, verify=ssl_verify
             )
-            response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+            response.raise_for_status()
             targets = response.json()
             self.log.debug(f"Received {len(targets)} targets from PlanetScale API.")
 
@@ -121,7 +99,11 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
             tags=[f"planetscale_org:{org_id}"],
         )
 
-        # Process each discovered target using the OpenMetricsBaseCheck logic
+        # Configure scrapers for each target
+        self.scrape_planetscale_targets(instance, targets)
+
+    def scrape_planetscale_targets(self, instance, targets):
+        # Process each discovered target
         for target_config in targets:
             if not target_config.get("targets"):
                 self.log.warning(
@@ -130,19 +112,48 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
                 continue
 
             # Create a dynamic instance configuration for this specific target
-            dynamic_instance = deepcopy(
-                instance
-            )  # Start with a copy of the original instance config
+            # Instead of a full deepcopy that might have PlanetScale specific configuration,
+            # Let's explicitly copy only the relevant OpenMetrics configuration
+            dynamic_instance = {
+                # OpenMetrics V2 configuration keys
+                "namespace": instance.get("namespace", "planetscale"),
+                "metrics": instance.get("metrics", []),
+                "exclude_metrics": instance.get("exclude_metrics", []),
+                "metadata_metrics": instance.get("metadata_metrics", []),
+                "metadata_label_map": instance.get("metadata_label_map", {}),
+                "prometheus_metrics_prefix": instance.get(
+                    "prometheus_metrics_prefix", ""
+                ),
+                "label_joins": instance.get("label_joins", {}),
+                "labels_mapper": instance.get("labels_mapper", {}),
+                "type_overrides": instance.get("type_overrides", {}),
+                "histogram_buckets_as_distributions": instance.get(
+                    "histogram_buckets_as_distributions", True
+                ),
+                "non_cumulative_histogram_buckets": instance.get(
+                    "non_cumulative_histogram_buckets", False
+                ),
+                "raw_metric_prefix": instance.get("raw_metric_prefix", ""),
+                "cache_metric_wildcards": instance.get("cache_metric_wildcards", True),
+                "monotonic_counter": instance.get("monotonic_counter", True),
+                "telemetry": instance.get("telemetry", True),
+                "ignore_tags": instance.get("ignore_tags", []),
+                "remap_metric_names": instance.get("remap_metric_names", True),
+                # Other useful configuration
+                "tags": instance.get("tags", []),
+                "ssl_verify": instance.get("ssl_verify", True),
+                "ssl_cert": instance.get("ssl_cert", None),
+                "ssl_private_key": instance.get("ssl_private_key", None),
+                "ssl_ca_cert": instance.get("ssl_ca_cert", None),
+                "timeout": instance.get("timeout", 10),
+            }
 
-            # --- Construct the full Prometheus URL ---
-            base_target = target_config["targets"][
-                0
-            ]  # e.g., "hostname:port" or "http://hostname:port"
+            # --- Construct the full endpoint URL ---
+            base_target = target_config["targets"][0]
             labels = target_config.get("labels", {})
 
             # Ensure base_target includes scheme
             if not base_target.startswith(("http://", "https://")):
-                # Default to http if not specified, adjust if needed
                 base_target = f"https://{base_target}"
 
             # Get metrics path, default to /metrics
@@ -156,55 +167,53 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
                 for key, value in labels.items()
                 if key.startswith("__param_")
             }
-            query_string = requests.compat.urlencode(
-                url_params
-            )  # Use requests' helper for encoding
+            query_string = requests.compat.urlencode(url_params)
 
             # Combine parts
             final_url = f"{base_target.rstrip('/')}{metrics_path}"
             if query_string:
                 final_url += f"?{query_string}"
 
-            # In V2, we use openmetrics_endpoint instead of prometheus_url
+            # Set the openmetrics_endpoint for the scraper config
             dynamic_instance["openmetrics_endpoint"] = final_url
+
+            # Disable tagging metrics with the endpoint
+            dynamic_instance["tag_by_endpoint"] = False
+
+            # Log configuration details for debugging
             self.log.debug(
                 f"Constructed scrape URL: {final_url} from target: {target_config}"
             )
-            # --- End URL Construction ---
+            self.log.debug(f"Using namespace: {dynamic_instance['namespace']}")
+            self.log.debug(f"Configured metrics: {dynamic_instance['metrics']}")
 
             # Merge labels from the target config into tags, excluding special __* labels
             discovered_labels = target_config.get("labels", {})
-            dynamic_tags = dynamic_instance.get("tags", [])  # Get existing tags
+            dynamic_tags = dynamic_instance.get("tags", []) or []
             for key, value in discovered_labels.items():
-                if not key.startswith(
-                    "__"
-                ):  # Exclude special labels like __metrics_path__, __param_*
-                    # Prefix discovered labels to avoid conflicts and add clarity
-                    dynamic_tags.append(f"ps_{key}:{value}")
-            dynamic_instance["tags"] = list(set(dynamic_tags))  # Ensure uniqueness
+                if not key.startswith("__"):
+                    dynamic_tags.append(f"{key}:{value}")
+            dynamic_instance["tags"] = list(set(dynamic_tags))
 
-            # Remove PlanetScale specific config keys as they are not needed by the base class processor
-            dynamic_instance.pop("planetscale_organization", None)
-            dynamic_instance.pop("ps_service_token_id", None)
-            dynamic_instance.pop("ps_service_token_secret", None)
-
+            # Create and process the scraper
             try:
-                # In V2, we use submit_openmetric_values instead of process
-                scraper = self.get_scraper(dynamic_instance)
-                if scraper:
-                    self.submit_openmetric_values(scraper, dynamic_instance)
-                else:
-                    self.log.error(f"Failed to get scraper for endpoint: {final_url}")
-                    raise Exception("Failed to initialize scraper")
+                # Set the namespace for this scraper
+                self.__NAMESPACE__ = dynamic_instance["namespace"]
+
+                # Create the scraper using the base class method
+                scraper = self.create_scraper(dynamic_instance)
+
+                # Log the scraper's namespace for debugging
+                self.log.debug(f"Scraper namespace: {scraper.namespace}")
+                self.log.debug(f"Check namespace: {self.__NAMESPACE__}")
+
+                # Perform the actual scraping
+                self.log.debug(f"Scraping metrics from {final_url}")
+                scraper.scrape()
+
             except Exception as e:
-                self.log.error(
-                    f"Error processing dynamic instance {dynamic_instance.get('openmetrics_endpoint')}: {e}"
-                )
-                # Add a service check for the specific target failure
+                self.log.error(f"Error scraping metrics from {final_url}: {e}")
                 target_tags = dynamic_instance.get("tags", [])
-                target_tags.append(
-                    f"openmetrics_endpoint:{dynamic_instance.get('openmetrics_endpoint')}"
-                )
                 self.service_check(
                     "planetscale.target.can_scrape",
                     AgentCheck.CRITICAL,
