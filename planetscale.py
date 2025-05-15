@@ -139,6 +139,8 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
                 "telemetry": instance.get("telemetry", True),
                 "ignore_tags": instance.get("ignore_tags", []),
                 "remap_metric_names": instance.get("remap_metric_names", True),
+                # Explicitly disable label caching to prevent label bleeding between scrapes
+                "cache_shared_labels": False,
                 # Other useful configuration
                 "tags": instance.get("tags", []),
                 "ssl_verify": instance.get("ssl_verify", True),
