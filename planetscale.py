@@ -134,13 +134,13 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
                     "non_cumulative_histogram_buckets", False
                 ),
                 "raw_metric_prefix": instance.get("raw_metric_prefix", ""),
-                "cache_metric_wildcards": instance.get("cache_metric_wildcards", True),
+                # Disable all caching mechanisms to prevent label bleeding between scrapes
+                "cache_metric_wildcards": False,
+                "cache_shared_labels": False,
                 "monotonic_counter": instance.get("monotonic_counter", True),
                 "telemetry": instance.get("telemetry", True),
                 "ignore_tags": instance.get("ignore_tags", []),
                 "remap_metric_names": instance.get("remap_metric_names", True),
-                # Explicitly disable label caching to prevent label bleeding between scrapes
-                "cache_shared_labels": False,
                 # Other useful configuration
                 "tags": instance.get("tags", []),
                 "ssl_verify": instance.get("ssl_verify", True),
