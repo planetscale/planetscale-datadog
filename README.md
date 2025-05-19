@@ -19,10 +19,18 @@ This allows you to monitor metrics exposed by your PlanetScale database branches
         *   Linux: `/etc/datadog-agent/checks.d/`
         *   macOS: `/opt/datadog-agent/etc/checks.d/`
         *   Windows: `C:\ProgramData\Datadog\checks.d\`
+        ```bash
+        # Linux (adjust path if necessary)
+        sudo -u dd-agent cp planetscale.py /etc/datadog-agent/checks.d/.
+
+        # MacOS (adjust path if necessary)
+        sudo -u dd-agent cp planetscale.py /opt/datadog-agent/etc/checks.d/.
+        ```
+
 2.  **Copy Configuration File:**
     *   Copy the `conf.d/planetscale.yaml.example` file to your Agent's `conf.d` directory (e.g., `/etc/datadog-agent/conf.d/`) and rename it to `planetscale.yaml`.
 3.  **Install Dependencies:**
-    * Place the `requirements.txt` file somewhere accessible by your datadog-agent, such as /etc/datadog-agent/planetscale.txt
+    * Place the `requirements.txt` file somewhere accessible by your datadog-agent, such as `/etc/datadog-agent/planetscale.txt`
     *   Install the required Python packages into the Datadog Agent's embedded Python environment. Open a terminal with appropriate permissions and run:
         ```bash
         # Linux/macOS (adjust path if necessary)
