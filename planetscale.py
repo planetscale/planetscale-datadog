@@ -140,7 +140,7 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
                 "ignore_tags": instance.get("ignore_tags", []),
                 "remap_metric_names": instance.get("remap_metric_names", True),
                 # Other useful configuration
-                "tags": instance.get("tags", []),
+                "tags": list(instance.get("tags", [])),
                 "ssl_verify": instance.get("ssl_verify", True),
                 "ssl_cert": instance.get("ssl_cert", None),
                 "ssl_private_key": instance.get("ssl_private_key", None),
