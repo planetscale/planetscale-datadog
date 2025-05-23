@@ -102,6 +102,7 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
 
         # Process targets in parallel
         request_concurrency = int(instance.get("request_concurrency", 1))
+        self.log.debug(f"Fetching branch metrics with concurrency: {request_concurrency}")
         with concurrent.futures.ThreadPoolExecutor(max_workers=request_concurrency) as executor:
             futures = [executor.submit(self.scrape_planetscale_target, instance, target) for target in targets]
             for future in concurrent.futures.as_completed(futures):
