@@ -23,4 +23,5 @@ instances:
     #   - 'static_tag:value' # Additional static tags to add to all metrics (dynamic tags are added automatically)
     # timeout: 5 # Override default timeout for scraping individual endpoints
     # ssl_verify: true # Set to false to disable SSL verification for scraping (not recommended)
+    # request_concurrency: 5 # Override default concurrency (2) to fetch more branch metrics in parallel
     # prometheus_metrics_prefix: 'mysql_' # Optional prefix to remove from metric names
