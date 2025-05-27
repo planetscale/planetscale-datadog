@@ -1,6 +1,6 @@
 import requests
 from copy import deepcopy
-
+import concurrent.futures
 from datadog_checks.base import AgentCheck, ConfigurationError
 from datadog_checks.base.checks.openmetrics.v2.base import OpenMetricsBaseCheckV2
 
@@ -103,6 +103,12 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
         self.scrape_planetscale_targets(instance, targets)
 
     def scrape_planetscale_targets(self, instance, targets):
+        # Set max workers - adjust based on your needs
+        max_workers = instance.get("max_concurrent_requests", 5)
+        
+        # Create a list to store target configurations for parallel processing
+        scrape_configs = []
+        
         # Process each discovered target
         for target_config in targets:
             if not target_config.get("targets"):
@@ -110,10 +116,8 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
                     f"Skipping target due to missing 'targets' field: {target_config}"
                 )
                 continue
-
-            # Create a dynamic instance configuration for this specific target
-            # Instead of a full deepcopy that might have PlanetScale specific configuration,
-            # Let's explicitly copy only the relevant OpenMetrics configuration
+                
+            # Create dynamic instance configuration (existing code)
             dynamic_instance = {
                 # OpenMetrics V2 configuration keys
                 "namespace": instance.get("namespace", "planetscale"),
@@ -195,28 +199,39 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
                     dynamic_tags.append(f"{key}:{value}")
             dynamic_instance["tags"] = list(set(dynamic_tags))
 
-            # Create and process the scraper
-            try:
-                # Set the namespace for this scraper
-                self.__NAMESPACE__ = dynamic_instance["namespace"]
-
-                # Create the scraper using the base class method
-                scraper = self.create_scraper(dynamic_instance)
-
-                # Log the scraper's namespace for debugging
-                self.log.debug(f"Scraper namespace: {scraper.namespace}")
-                self.log.debug(f"Check namespace: {self.__NAMESPACE__}")
-
-                # Perform the actual scraping
-                self.log.debug(f"Scraping metrics from {final_url}")
-                scraper.scrape()
-
-            except Exception as e:
-                self.log.error(f"Error scraping metrics from {final_url}: {e}")
-                target_tags = dynamic_instance.get("tags", [])
-                self.service_check(
-                    "planetscale.target.can_scrape",
-                    AgentCheck.CRITICAL,
-                    message=str(e),
-                    tags=target_tags,
-                )
+            # Add to scrape configs instead of scraping immediately
+            scrape_configs.append(dynamic_instance)
+        
+        # Execute scrapes in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(self._scrape_single_target, config) for config in scrape_configs]
+            # Wait for all to complete
+            concurrent.futures.wait(futures)
+            
+    def _scrape_single_target(self, dynamic_instance):
+        try:
+            # Set the namespace for this scraper
+            self.__NAMESPACE__ = dynamic_instance["namespace"]
+            
+            # Create the scraper using the base class method
+            scraper = self.create_scraper(dynamic_instance)
+            
+            # Log the scraper's namespace for debugging
+            self.log.debug(f"Scraper namespace: {scraper.namespace}")
+            self.log.debug(f"Check namespace: {self.__NAMESPACE__}")
+            
+            # Perform the actual scraping
+            endpoint = dynamic_instance.get("openmetrics_endpoint", "unknown")
+            self.log.debug(f"Scraping metrics from {endpoint}")
+            scraper.scrape()
+            
+        except Exception as e:
+            endpoint = dynamic_instance.get("openmetrics_endpoint", "unknown")
+            self.log.error(f"Error scraping metrics from {endpoint}: {e}")
+            target_tags = dynamic_instance.get("tags", [])
+            self.service_check(
+                "planetscale.target.can_scrape",
+                AgentCheck.CRITICAL,
+                message=str(e),
+                tags=target_tags,
+            )
