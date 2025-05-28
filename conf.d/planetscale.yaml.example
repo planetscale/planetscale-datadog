@@ -24,3 +24,4 @@ instances:
     # timeout: 5 # Override default timeout for scraping individual endpoints
     # ssl_verify: true # Set to false to disable SSL verification for scraping (not recommended)
     # prometheus_metrics_prefix: 'mysql_' # Optional prefix to remove from metric names
+    # max_concurrent_requests: 1 # Override default to enable concurrent requests for PlanetScale branch metrics
