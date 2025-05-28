@@ -94,7 +94,7 @@ Note that Datadog strips some metric suffixes:
 
 > Starting in Datadog Agent v7.32.0, in adherence to the OpenMetrics specification standard, counter names ending in _total must be specified without the _total suffix. For example, to collect promhttp_metric_handler_requests_total, specify the metric name promhttp_metric_handler_requests. This submits to Datadog the metric name appended with .count, promhttp_metric_handler_requests.count.
 
-From their [documentation](https://github.com/DataDog/integrations-core/blob/master/openmetrics/README.md)
+From their [documentation](https://github.com/DataDog/integrations-core/blob/master/openmetrics/README.md). This means when configuring the agent to scrape `planetscale_mysql_bytes_received_total`, you want to configure Datadog for `planetscale_mysql_bytes_received`.
 
 **Key Configuration Options:**
 
