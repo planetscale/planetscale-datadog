@@ -104,7 +104,7 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
 
     def scrape_planetscale_targets(self, instance, targets):
         # Set max workers - adjust based on your needs
-        max_workers = instance.get("max_concurrent_requests", 5)
+        max_workers = instance.get("max_concurrent_requests", 1)
         
         # Create a list to store target configurations for parallel processing
         scrape_configs = []

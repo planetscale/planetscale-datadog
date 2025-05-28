@@ -78,6 +78,10 @@ instances:
     send_distribution_buckets: true
     collect_counters_with_distributions: true
 
+    # Optional: Maximum number of concurrent requests to make to PlanetScale endpoints
+    # Adjust based on your needs and available resources
+    max_concurrent_requests: 1
+
     # Optional OpenMetricsBaseCheck settings (applied to discovered endpoints)
     # tags:
     #   - 'static_tag:value' # Additional static tags added to all metrics
