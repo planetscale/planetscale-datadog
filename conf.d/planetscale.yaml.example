@@ -7,6 +7,9 @@ instances:
     metrics: # Required: List of metrics to collect. Use mapping for renaming/type overrides.
       - planetscale_vtgate_queries_duration: vtgate_query_duration
 
+    # Example for all metrics. Cannot be used with enumerated list above. Does not support renaming/type overrides.
+    # metrics: [".*"]
+
       # Add other metrics exposed by the PlanetScale endpoints here
       # Example with type override:
       # - some_metric:
