@@ -21,6 +21,15 @@ instances:
     send_distribution_buckets: true
     collect_counters_with_distributions: true
 
+    # Optional: Per-database tag overrides. Additive on top of the `tags` list below.
+    # Keys are database names as returned by the PlanetScale API; values are lists of extra tags
+    # applied only to metrics from that database. Each entry can specify one or more tags.
+    # Useful when a single org contains a mix of environments, teams, tiers, etc.
+    # database_tags:
+    #   my-prod-db: ['env:prod', 'team:billing', 'tier:critical']
+    #   my-staging-db: ['env:staging']
+    #   shared-analytics-db: ['team:data', 'tier:standard', 'compliance:pci']
+
     # Optional OpenMetricsBaseCheck settings for discovered endpoints
     # tags:
     #   - 'static_tag:value' # Additional static tags to add to all metrics (dynamic tags are added automatically)

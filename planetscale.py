@@ -197,6 +197,17 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
             for key, value in discovered_labels.items():
                 if not key.startswith("__"):
                     dynamic_tags.append(f"{key}:{value}")
+
+            # Apply per-database tag overrides, additive on top of the instance-level tags
+            database_tags_config = instance.get("database_tags", {})
+            db_name = discovered_labels.get("planetscale_database_name")
+            if db_name and db_name in database_tags_config:
+                extra_tags = database_tags_config[db_name]
+                dynamic_tags.extend(extra_tags)
+                self.log.debug(
+                    f"Applied database_tags for '{db_name}': {extra_tags}"
+                )
+
             dynamic_instance["tags"] = list(set(dynamic_tags))
 
             # Add to scrape configs instead of scraping immediately
