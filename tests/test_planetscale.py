@@ -109,6 +109,34 @@ class TestDatabaseTags:
         configs = capture_scraper_configs(make_instance(), [make_target()])
         assert not any(t.startswith("env:") for t in configs[0]["tags"])
 
+    def test_null_config_is_noop(self, capture_scraper_configs):
+        configs = capture_scraper_configs(
+            make_instance(database_tags=None), [make_target()]
+        )
+        assert not any(t.startswith("env:") for t in configs[0]["tags"])
+
+    def test_normalizes_single_tag_string(self, capture_scraper_configs):
+        configs = capture_scraper_configs(
+            make_instance(database_tags={"my-db": "env:prod"}),
+            [make_target(database_name="my-db")],
+        )
+        assert "env:prod" in configs[0]["tags"]
+        assert not any(len(tag) == 1 for tag in configs[0]["tags"])
+
+    def test_invalid_tag_value_raises(self, capture_scraper_configs):
+        with pytest.raises(ConfigurationError, match="database_tags\\[my-db\\]"):
+            capture_scraper_configs(
+                make_instance(database_tags={"my-db": None}),
+                [make_target(database_name="my-db")],
+            )
+
+    def test_invalid_top_level_shape_raises(self, capture_scraper_configs):
+        with pytest.raises(ConfigurationError, match="database_tags"):
+            capture_scraper_configs(
+                make_instance(database_tags=["env:prod"]),
+                [make_target(database_name="my-db")],
+            )
+
 
 class TestTargetConfig:
     def test_discovered_labels_become_tags(self, capture_scraper_configs):
