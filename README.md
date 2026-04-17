@@ -103,6 +103,14 @@ From their [documentation](https://github.com/DataDog/integrations-core/blob/mas
 *   `namespace`: Prefix added to all collected metrics (e.g., `planetscale.cluster_size`).
 *   `metrics`: A list defining which metrics to collect from the discovered Prometheus endpoints. You can rename metrics or override their types here.
 *   `tags`: Optional static tags to add to all metrics collected by this instance. Discovered labels (like database and branch name) are automatically added as tags prefixed with `ps_`.
+*   `database_tags`: Optional mapping of database name to a list of extra tags, applied only to metrics from that database. Additive on top of `tags`. Each entry can specify one or more tags. Use this when databases in a single org need distinct tagging — for example, mixed environments in one org, per-team ownership, tiering, or compliance scope:
+
+    ```yaml
+    database_tags:
+      my-prod-db: ['env:prod', 'team:billing', 'tier:critical']
+      my-staging-db: ['env:staging']
+      shared-analytics-db: ['team:data', 'tier:standard', 'compliance:pci']
+    ```
 
 ## Validation
 
@@ -118,3 +126,15 @@ From their [documentation](https://github.com/DataDog/integrations-core/blob/mas
 *   **API Connection Issues:** Verify the Service Token ID and Secret are correct and have the necessary permissions in PlanetScale. Check the `planetscale.api.can_connect` service check status. Ensure the Datadog Agent host has network connectivity to `api.planetscale.com`.
 *   **Scraping Errors:** Check the `planetscale.target.can_scrape` service check. Verify the discovered endpoints are accessible from the Agent host and are serving valid OpenMetrics/Prometheus data. Check Agent logs (`agent.log`, `collector.log`) for more detailed errors related to scraping.
 *   **Missing Metrics:** Ensure the metric names in your `planetscale.yaml` `metrics` list exactly match the names exposed by the PlanetScale endpoints (after any potential `prometheus_metrics_prefix` removal). Verify the `namespace` is correct.
+
+## Development
+
+Unit tests cover the check's config construction, tag merging, URL assembly, and API error handling. To run them:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r tests/requirements.txt
+.venv/bin/pytest
+```
+
+The tests patch `create_scraper` so no Datadog Agent runtime or PlanetScale API credentials are required.

@@ -1,0 +1,3 @@
+pytest
+datadog-checks-base[deps]
+requests

@@ -105,6 +105,7 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
     def scrape_planetscale_targets(self, instance, targets):
         # Set max workers - adjust based on your needs
         max_workers = instance.get("max_concurrent_requests", 1)
+        database_tags_config = self._normalize_database_tags(instance.get("database_tags"))
         
         # Create a list to store target configurations for parallel processing
         scrape_configs = []
@@ -197,6 +198,16 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
             for key, value in discovered_labels.items():
                 if not key.startswith("__"):
                     dynamic_tags.append(f"{key}:{value}")
+
+            # Apply per-database tag overrides, additive on top of the instance-level tags
+            db_name = discovered_labels.get("planetscale_database_name")
+            if db_name and db_name in database_tags_config:
+                extra_tags = database_tags_config[db_name]
+                dynamic_tags.extend(extra_tags)
+                self.log.debug(
+                    f"Applied database_tags for '{db_name}': {extra_tags}"
+                )
+
             dynamic_instance["tags"] = list(set(dynamic_tags))
 
             # Add to scrape configs instead of scraping immediately
@@ -235,3 +246,29 @@ class PlanetScaleCheck(OpenMetricsBaseCheckV2):
                 message=str(e),
                 tags=target_tags,
             )
+
+    def _normalize_database_tags(self, database_tags):
+        if database_tags is None:
+            return {}
+
+        if not isinstance(database_tags, dict):
+            raise ConfigurationError(
+                "Option 'database_tags' must be a mapping of database names to a tag or list of tags."
+            )
+
+        normalized_database_tags = {}
+        for db_name, extra_tags in database_tags.items():
+            if isinstance(extra_tags, str):
+                normalized_database_tags[db_name] = [extra_tags]
+                continue
+
+            if not isinstance(extra_tags, list) or not all(
+                isinstance(tag, str) for tag in extra_tags
+            ):
+                raise ConfigurationError(
+                    f"Option 'database_tags[{db_name}]' must be a string or list of strings."
+                )
+
+            normalized_database_tags[db_name] = extra_tags
+
+        return normalized_database_tags
